@@ -11,7 +11,7 @@ static bool findHairShaders(RE::NiAVObject* av, T&& fn)
 
 	RE::NiProperty* prop{};
 	if (auto shape = av->AsTriShape())
-		prop = shape->GetGeometryRuntimeData().properties[RE::BSGeometry::States::kEffect].get();
+		prop = shape->GetGeometryRuntimeData().shaderProperty.get()  /* CommonLib 11: properties[kEffect] */;
 	else if (auto shape = av->AsNiTriShape())
 		prop = shape->GetRuntimeData().spEffectState.get();
 	else if (RE::NiNode* node = av->AsNode()) {
@@ -112,7 +112,7 @@ static RE::NiAVObject* AttachArmor_hook(RE::BipedAnim* _this, RE::NiNode* armor,
 }
 static uintptr_t getModuleOffset(uintptr_t pFunc, char* name, size_t size) {
 	__try { // probably safer?	
-		auto getModule = [](uintptr_t addr, char* cbuf, size_t ss) [[msvc::forceinline]] -> uintptr_t {
+		auto getModule = [](uintptr_t addr, char* cbuf, size_t ss) -> uintptr_t {
 			DWORD cbNeeded;
 			auto proc = GetCurrentProcess();
 			if (HMODULE hmods[1024]; EnumProcessModules(proc, hmods, sizeof(hmods), &cbNeeded))
@@ -121,12 +121,12 @@ static uintptr_t getModuleOffset(uintptr_t pFunc, char* name, size_t size) {
 						(uintptr_t)modInfo.lpBaseOfDll <= addr && addr < ((uintptr_t)modInfo.lpBaseOfDll + modInfo.SizeOfImage))
 					{
 						//char szModName[MAX_PATH];
-						GetModuleFileName(hmods[i], cbuf, ss);
+						GetModuleFileNameA(hmods[i], cbuf, static_cast<DWORD>(ss));
 						return addr - (uintptr_t)modInfo.lpBaseOfDll;
 					}
 			return { };
 		};
-		auto unwrap = [](uintptr_t addr) [[msvc::forceinline]] -> uintptr_t {
+		auto unwrap = [](uintptr_t addr) -> uintptr_t {
 			return *(WORD*)(addr) == 0x25FF ? (addr + 6) /* rip */ + *(INT32*)(addr + 2) /* rel32 */ : NULL;
 		};
 		if (auto target = unwrap(pFunc); target || (target = unwrap(pFunc + 5 + *(INT32*)(pFunc + 1))))
